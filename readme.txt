@@ -1,0 +1,2 @@
+[1] Get a private ethereum node (I recommend using https://llamanodes.com/) and save the https endpoint in "node.txt". You can also use the public endpoint, but it will slow down the process.
+[2] Run "checker.py" and follow the instructions.
