@@ -76,7 +76,7 @@ def check_file(eth, line):
 def setup_random_check():
   checked = 0
 
-  length = int(input(f'Input the lenght of the domain name >>> '))
+  length = int(input(f'Input the length of the domain name >>> '))
 
   clear()
 
@@ -128,7 +128,7 @@ def setup_random_check():
 
 def setup_sorted_check():
   checked = 0
-  length = int(input(f'Input the lenght of the domain name >>> '))
+  length = int(input(f'Input the length of the domain name >>> '))
 
   clear()
 
