@@ -1,8 +1,10 @@
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
+import time
+from time import sleep
 import os
+import threading
 import random
-import colorama
 import web3
 from ens import ENS
 
@@ -16,7 +18,32 @@ def clear():
   os.system('cls')
 
 
-def check_random_domains():
+def check_random_domains(charset, length):
+  random_string = ''.join(random.choice(charset) for i in range(int(length)))
+  eth = '.eth'
+
+  all_names = open('available.txt', 'r').read()
+
+  domain_name = '{}{}'.format(random_string, eth)
+  address = ns.address(domain_name)
+
+  if address == None and ns.owner(domain_name) == '0x0000000000000000000000000000000000000000' and all_names.find(random_string) == -1:
+
+    with open('available.txt', 'a') as f:
+      f.writelines(f'{domain_name}\n')
+
+
+def check_file(eth, line):
+  domain_name = '{}{}'.format(line, eth)
+  address = ns.address(domain_name)
+
+  if address == None and ns.owner(domain_name) == '0x0000000000000000000000000000000000000000':
+
+    with open('available.txt', 'a') as f:
+      f.writelines(f'{domain_name}\n')
+
+
+def setup_random_check():
   checked = 0
 
   length = int(input(f'Input the lenght of the domain name >>> '))
@@ -51,35 +78,25 @@ def check_random_domains():
 
   clear()
 
+  start_time = time.time()
+
+  sleep(0.000001)
+
   for i in range(number):
 
-    random_string = ''.join(random.choice(charset) for i in range(int(length)))
-    eth = '.eth'
-
-    all_names = open('available.txt', 'r').read()
-
-    domain_name = '{}{}'.format(random_string, eth)
-    address = ns.address(domain_name)
-
-    if address == None and ns.owner(domain_name) == '0x0000000000000000000000000000000000000000' and all_names.find(random_string) == -1:
-
-      with open('available.txt', 'a') as f:
-        f.writelines(f'{domain_name}\n')
-
-      color = colorama.Fore.GREEN
-
-    else:
-
-      color = colorama.Fore.RED
+    time_difference = start_time - time.time()
+    checks_per_second = checked / time_difference
 
     checked = checked + 1
+    print('Checked ' + str(checked) + ' domain names! Average: '  + str(round(abs(checks_per_second))) + ' per second', end='\r')
 
-    print('Checked', color + colorama.Style.BRIGHT + str(checked) + colorama.Style.RESET_ALL, 'domain names!', end='\r')
+    thread = threading.Thread(target=check_random_domains, args=(charset, length))
+    thread.start()
 
   input('\ndone')
 
 
-def check_file():
+def setup_file_check():
 
   checked = 0
 
@@ -97,25 +114,21 @@ def check_file():
 
   clear()
 
+  start_time = time.time()
+
+  sleep(0.000001)
+
   for line in file:
-    
-    domain_name = '{}{}'.format(line, eth)
-    address = ns.address(domain_name)
 
-    if address == None and ns.owner(domain_name) == '0x0000000000000000000000000000000000000000':
+    time_difference = start_time - time.time()
 
-      with open('available.txt', 'a') as f:
-        f.writelines(f'{domain_name}\n')
-
-      color = colorama.Fore.GREEN
-
-    else:
-
-      color = colorama.Fore.RED
+    checks_per_second = checked / time_difference
 
     checked = checked + 1
+    print('Checked ' + str(checked) + ' domain names! Average: '  + str(round(abs(checks_per_second))) + ' per second', end='\r')
 
-    print('Checked', color + colorama.Style.BRIGHT + str(checked) + colorama.Style.RESET_ALL, 'domain names!', end='\r')
+    thread = threading.Thread(target=check_file, args=(eth, line))
+    thread.start()
 
   input('\ndone')
 
@@ -131,7 +144,7 @@ option = int(input('Enter your option >>> '))
 
 if option == 1:
   clear()
-  check_random_domains()
+  setup_random_check()
 elif option == 2:
   clear()
-  check_file()
+  setup_file_check()
