@@ -10,6 +10,8 @@ import threading
 import web3
 
 
+checked = 0
+
 lock = threading.Lock()
 
 node = file = open('node.txt','r').readline()
@@ -51,12 +53,12 @@ def generate_sorted_strings(charset, length, sorted_string = ''):
 
 
 def check_sorted_domains(sorted_string):
-
+  
   does_file_already_contain_string = open('available.txt', 'r').read().find(sorted_string) == -1
 
   domain_name = '{}{}'.format(sorted_string, '.eth')
   address = ns.address(domain_name)
-
+  
   if address == None and ns.owner(domain_name) == '0x0000000000000000000000000000000000000000' and does_file_already_contain_string:
 
     with open('available.txt', 'a') as f:
@@ -74,7 +76,8 @@ def check_file(eth, line):
 
 
 def setup_random_check():
-  checked = 0
+  
+  global checked
 
   length = int(input(f'Input the length of the domain name >>> '))
 
@@ -127,7 +130,9 @@ def setup_random_check():
 
 
 def setup_sorted_check():
-  checked = 0
+  
+  global checked
+
   length = int(input(f'Input the length of the domain name >>> '))
 
   clear()
@@ -174,7 +179,7 @@ def setup_sorted_check():
 
     thread = threading.Thread(target=generate_sorted_strings, args=(charset, length))
     thread.start()
-
+    
   input('\ndone')
 
 
