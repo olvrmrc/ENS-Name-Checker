@@ -1,12 +1,23 @@
-import warnings
-warnings.simplefilter(action = 'ignore', category = FutureWarning)
-
-from concurrent.futures import ThreadPoolExecutor
 from ens import ENS
 import os
 import random
+from terminaltables import AsciiTable
 import threading
+import time
 import web3
+
+
+stats = {
+    'checked': 0,
+    'checks_per_second': 0,
+    'failed_checks': 0,
+    'time_difference': 0,
+    'checked_strings': []
+}
+
+
+table_data = [["Successful", "Failed", "Average", "Running Time"], [0, 0, 0, 0]]
+table = AsciiTable(table_data)
 
 
 def clear():
@@ -14,76 +25,122 @@ def clear():
 
 
 class Checker:
-    # declaration of variables
-    checked = 0
-    lock = threading.Lock()
     node = file = open('node.txt','r').readline() # default setting is https://eth.llamarpc.com
-    pool = ThreadPoolExecutor(max_workers=200)
-    w3 = web3.Web3(web3.HTTPProvider(node))
-    ns = ENS.fromWeb3(w3)
+    ns = ENS.fromWeb3(web3.Web3(web3.HTTPProvider(node)))
 
-    # general check function, mode is specified in Setup.start()
-    def check(self, charset, eth, file, length, mode, quantity_to_be_checked):
-        checked = self.checked
+    def random_check(self, charset, length):
+        try:
+            random_string = ''.join(random.choice(charset) for i in range(int(length)))
+            domain_name = '{}{}'.format(random_string, '.eth')
 
-        # checking randomly generated domain names
-        if mode == 1:
-            for i in range(quantity_to_be_checked):
-                random_string = ''.join(random.choice(charset) for i in range(int(length)))
+            string_already_checked = random_string in stats['checked_strings']
+            address_unset = self.ns.address(domain_name) == None
+            owner_unset = self.ns.owner(domain_name) == '0x0000000000000000000000000000000000000000'
 
-                does_file_already_contain_string = open('available.txt', 'r').read().find(random_string) != -1
-                domain_name = '{}{}'.format(random_string, '.eth')
-                address = self.ns.address(domain_name) == None
-                owner = self.ns.owner(domain_name) == '0x0000000000000000000000000000000000000000'
+            if address_unset and owner_unset and not string_already_checked:
 
-                if address and owner and not does_file_already_contain_string:
-                    with open('available.txt', 'a') as f:
-                        f.writelines(f'{domain_name}\n')
+                with open('available.txt', 'a') as f:
+                    f.writelines(f'{domain_name}\n')
 
-                checked += 1
-                print('Checked ' + str(checked) + ' domain names!', end='\r')
+            stats['checked_strings'].append(random_string)
+            stats['checked'] += 1
 
-        # checking alphabetically generated domain names
-        elif mode == 2:
-            output = []
+        except:
+            stats['failed_checks'] += 1
 
-            for i in range(quantity_to_be_checked):
-                s = ""
-                for j in range(length):
-                    s += charset[i%len(charset)]
-                    i //= len(charset)
-                output.append(s)
 
-                sorted_string = output[i-1][::-1]
+    def sorted_check(self, sorted_string):
+        try:
+            domain_name = '{}{}'.format(sorted_string, '.eth')
 
-                does_file_already_contain_string = open('available.txt', 'r').read().find(sorted_string) != -1
-                domain_name = '{}{}'.format(sorted_string, '.eth')
-                address = self.ns.address(domain_name) == None
-                owner = self.ns.owner(domain_name) == '0x0000000000000000000000000000000000000000'
+            string_already_checked = sorted_string in stats['checked_strings']
+            address = self.ns.address(domain_name) == None
+            owner = self.ns.owner(domain_name) == '0x0000000000000000000000000000000000000000'
+    
+            if address and owner and not string_already_checked:
+                with open('available.txt', 'a') as f:
+                    f.writelines(f'{domain_name}\n')
+    
+            stats['checked_strings'].append(sorted_string)
+            stats['checked'] += 1
 
-                if address and owner and not does_file_already_contain_string:
-                    with open('available.txt', 'a') as f:
-                        f.writelines(f'{domain_name}\n')
+        except:
+            stats['failed_checks'] += 1
 
-                checked += 1
-                print('Checked ' + str(checked) + ' domain names!', end='\r')
+    def file_check(self, eth, file, start_time):
+        for line in file:
+            domain_name = '{}{}'.format(line, eth)
 
-        # checking domain names given in a specific file
-        elif mode == 3:
-            for line in file:
-                domain_name = '{}{}'.format(line, eth)
-                address = self.ns.address(domain_name)
-                owner = self.ns.owner(domain_name) == '0x0000000000000000000000000000000000000000'
+            address = self.ns.address(domain_name)
+            owner = self.ns.owner(domain_name) == '0x0000000000000000000000000000000000000000'
 
-                if address == None and owner:
-                  with open('available.txt', 'a') as f:
+            if address == None and owner:
+                with open('available.txt', 'a') as f:
                     f.writelines(f'{domain_name}\n')
                 
-                checked += 1
-                print('Checked ' + str(checked) + ' domain names!', end='\r')
+            stats['checked'] += 1
 
-        clear()
-        input(f'Done, checked {checked} domain names.')
+            stats['time_difference'] = time.time() - start_time
+            stats['checks_per_second'] = (stats['checked'] + stats['failed_checks']) / stats['time_difference']
+
+            table.table_data[1] = [stats['checked'], stats['failed_checks'], round(stats['checks_per_second'], 2), round(stats['time_difference'], 2)]
+            print(table.table)
+
+            print("\033[H\033[J", end="")
+
+
+def redirect(charset, eth, file, length, mode, quantity_to_be_checked):
+    start_time = time.time()
+    time.sleep(0.00000001)
+
+    # checking randomly generated domain names
+    if mode == 1:
+        for i in range(quantity_to_be_checked):
+            thread = threading.Thread(target=Checker().random_check, args=(charset, length))
+            thread.start()
+
+            stats['time_difference'] = time.time() - start_time
+            stats['checks_per_second'] = (stats['checked'] + stats['failed_checks']) / stats['time_difference']
+
+            table.table_data[1] = [stats['checked'], stats['failed_checks'], round(stats['checks_per_second'], 2), round(stats['time_difference'], 2)]
+            print(table.table)
+
+            time.sleep(0.085)
+            print("\033[H\033[J", end="")
+
+    # checking alphabetically generated domain names
+    elif mode == 2:
+        output = []
+
+        for i in range(quantity_to_be_checked):
+            s = ''
+            for j in range(length):
+                s += charset[i%len(charset)]
+                i //= len(charset)
+            output.append(s)
+
+            sorted_string = output[i-1][::-1]
+
+            Checker.sorted_check(Checker, sorted_string)
+
+            stats['time_difference'] = time.time() - start_time
+            stats['checks_per_second'] = (stats['checked'] + stats['failed_checks']) / stats['time_difference']
+
+            table.table_data[1] = [stats['checked'], stats['failed_checks'], round(stats['checks_per_second'], 2), round(stats['time_difference'], 2)]
+            print(table.table)
+
+            print("\033[H\033[J", end="")
+
+    # checking domain names given in a specific file
+    elif mode == 3:
+        Checker.file_check(Checker, eth, file, start_time)
+
+    clear()
+
+    end_time = time.time()
+    checked = stats['checked']
+
+    input(f'Done, checked {checked} domain names in {str(round(abs(end_time - start_time)))} seconds.')
 
 
 # setting up the variables
@@ -106,11 +163,11 @@ class Setup:
         clear()
 
         if select_character_set_option == 1:
-          charset = "1","2","3","4","5","6","7","8","9","0"
+          charset = '0123456789'
         elif select_character_set_option == 2:
-          charset = "a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"
+          charset = 'abcdefghijklmnopqrstuvwxyz'
         elif select_character_set_option == 3:
-          charset = "1","2","3","4","5","6","7","8","9","0","a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"
+          charset = '0123456789abcdefghijklmnopqrstuvwxyz'
         elif select_character_set_option == 4:
           print('You can use numbers from 0 to 9 and lowercase letters. Use the following syntax: 123abc')
           print()
@@ -126,7 +183,7 @@ class Setup:
         eth = None
         file = None
 
-        Checker.pool.submit(Checker().check(charset, eth, file, length, mode, quantity_to_be_checked))
+        redirect(charset, eth, file, length, mode, quantity_to_be_checked)
 
     # variables for mode 3
     def settings_for_file(mode):
@@ -149,7 +206,7 @@ class Setup:
         length = None
         quantity_to_be_checked = None
         
-        Checker.pool.submit(Checker().check(charset, eth, file, length, mode, quantity_to_be_checked))
+        redirect(charset, eth, file, length, mode, quantity_to_be_checked)
 
     # start of the program
     def start():
